@@ -54,3 +54,72 @@
 // Example:
 // User: "How do I create a function in JavaScript?"
 // Bot: "You can create a function using the `function` keyword or as an arrow function. Here's an example: ..."
+
+import OpenAI from "openai";
+import dotenv from "dotenv";
+import readline from "readline";
+
+// Load environment variables from .env
+dotenv.config();
+const token = process.env["GITHUB_TOKEN"];
+const endpoint = "https://models.github.ai/inference";
+const modelName = "openai/gpt-4o";
+
+async function main() {
+	// Initialize OpenAI client with GitHub's endpoint and token
+	const client = new OpenAI({ baseURL: endpoint, apiKey: token });
+
+	// Set up readline interface for user interaction
+	const rl = readline.createInterface({
+		input: process.stdin,
+		output: process.stdout
+	});
+
+	// Initial system prompt for coding assistant
+	const systemPrompt =
+		"You are a multi-turn coding assistant chatbot. You provide clear, helpful, and accurate programming help, code examples, debugging, and best practices. Support multiple programming languages. Maintain context across the conversation.";
+
+	let messages = [
+		{ role: "system", content: systemPrompt }
+	];
+
+	console.log("Welcome to the Coding Assistant Chatbot! (Type 'exit' to quit)\n");
+
+
+	async function chatLoop() {
+		rl.question("You: ", async (input) => {
+			if (input.trim().toLowerCase() === "exit") {
+				console.log("Goodbye!");
+				rl.close();
+				return;
+			}
+			messages.push({ role: "user", content: input });
+			try {
+				const response = await client.chat.completions.create({
+					messages,
+					model: modelName,
+					temperature: 0.7,
+					max_tokens: 1200
+				});
+				const reply = response.choices[0].message.content;
+				console.log("Assistant:", reply);
+				messages.push({ role: "assistant", content: reply });
+			} catch (err) {
+				if (err?.error?.message) {
+					console.error("[API Error]", err.error.message);
+				} else {
+					console.error("[Error]", err.message || err);
+				}
+			}
+			chatLoop();
+		});
+	}
+
+	chatLoop();
+}
+
+// Always run the chatbot when this file is executed
+main().catch((err) => {
+	console.error("The chatbot encountered an error:", err);
+	process.exit(1);
+});
